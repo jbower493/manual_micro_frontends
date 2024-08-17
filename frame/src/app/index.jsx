@@ -9,8 +9,7 @@ function App() {
 
     function forceRerender() {
         setState({});
-        const message = { type: "ROUTE_CHANGE", data: "The route changed" };
-        window.postMessage(message, "*");
+        window.routeChangePubSub.publish();
     }
 
     return (
