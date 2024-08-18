@@ -1,0 +1,18 @@
+Problem:
+- Need to have MFE's which have their own internal routing
+- MFE's need the ability to be written using any router or even framework
+- MFE's need to be able to be deployed independently of each other and host app
+
+Use cases:
+- Refactoring legacy app from one router / framework to another, using strangler pattern
+- Company has multiple teams that need to work independently on different parts of an application, using their own development lifecycles
+- One part of application needs to use
+
+- Spin up 3 apps: Host, and 2 MFE's
+- Host app includes an extra div in the html for every MFE that needs to mount
+- Host app html includes the JS script of each MFE
+- Each MFE is mounted but "dormant" until the host app navigates to its route
+- Create global route change pub sub and attach it to window
+- The host, as well as every MFE, must publish a "route change" event every time they change the url from their internal routing
+- Host subscribes to route change events, and syncs it's own routing on each change so it always knows the url
+- Each MFE subscribes to route change events, and only syncs it's own routing when it's base route "active" state changes
