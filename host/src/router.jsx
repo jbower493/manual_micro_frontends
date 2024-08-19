@@ -29,11 +29,13 @@ export const router = createBrowserRouter([
             },
             {
                 path: "/online-shop",
-                element: <div id="onlineShopMount">Host: /online-shop</div>,
+                element: <div id="onlineShopContainer">Host: /online-shop</div>,
             },
             {
                 path: "/store-locator",
-                element: <div id="storeLocatorMount">Host: /store-locator</div>,
+                element: (
+                    <div id="storeLocatorContainer">Host: /store-locator</div>
+                ),
             },
         ],
     },

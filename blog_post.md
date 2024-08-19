@@ -125,11 +125,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: "/online-shop",
-                element: <div id="onlineShopMount">Host: /online-shop</div>,
+                element: <div id="onlineShopContainer">Host: /online-shop</div>,
             },
             {
                 path: "/store-locator",
-                element: <div id="storeLocatorMount">Host: /store-locator</div>,
+                element: <div id="storeLocatorContainer">Host: /store-locator</div>,
             },
         ],
     },
@@ -173,6 +173,29 @@ main {
 }
 ```
 
+Finally (for now) we'll add two extra "root" div's in the index.html file. These div's are where we will mount our 2 MFE applications.
+
+```
+<body>
+    <!-- Host app mount -->
+    <div id="root"></div>
+
+    <!-- Online shop MFE mount -->
+    <div id="onlineShopRoot"></div>
+
+    <!-- Store locator MFE mount -->
+    <div id="storeLocatorRoot"></div>
+
+    <script type="module" src="/src/main.jsx"></script>
+</body>
+```
+
 Now if we go back to our host app in the browser, we should have a nav with a link to each of our routes, and the code for each route should render in the main page when that route is active.
 
 ![Online Shop](./blog_images/host_scaffolding.PNG)
+
+## Online Shop MFE
+
+## Store locator MFE
+
+## Syncing the routing between Host and MFE's
