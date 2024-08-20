@@ -16,6 +16,7 @@ export const router = createBrowserRouter([
                 <main>
                     <Outlet />
                 </main>
+                <footer>Footer</footer>
             </div>
         ),
         children: [
@@ -28,7 +29,7 @@ export const router = createBrowserRouter([
                 element: <div>Host: /about</div>,
             },
             {
-                path: "/online-shop",
+                path: "/online-shop/*",
                 element: <div id="onlineShopContainer">Host: /online-shop</div>,
             },
             {

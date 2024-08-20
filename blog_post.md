@@ -112,6 +112,7 @@ export const router = createBrowserRouter([
                 <main>
                     <Outlet />
                 </main>
+                <footer>Footer</footer>
             </div>
         ),
         children: [
@@ -124,12 +125,14 @@ export const router = createBrowserRouter([
                 element: <div>Host: /about</div>,
             },
             {
-                path: "/online-shop",
+                path: "/online-shop/*",
                 element: <div id="onlineShopContainer">Host: /online-shop</div>,
             },
             {
                 path: "/store-locator",
-                element: <div id="storeLocatorContainer">Host: /store-locator</div>,
+                element: (
+                    <div id="storeLocatorContainer">Host: /store-locator</div>
+                ),
             },
         ],
     },
@@ -154,7 +157,14 @@ Next we'll add some minimal styling
 
 ```
 // host/src/index.css
-header {
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+header,
+footer {
     height: 60px;
     padding: 0 30px;
     background-color: lightblue;
@@ -170,12 +180,18 @@ header nav {
 
 main {
     padding: 30px;
+    height: 250px;
+}
+
+footer {
+    background-color: lightpink;
 }
 ```
 
 Finally (for now) we'll add two extra "root" div's in the index.html file. These div's are where we will mount our 2 MFE applications.
 
 ```
+// host/src/index.html
 <body>
     <!-- Host app mount -->
     <div id="root"></div>
@@ -196,6 +212,161 @@ Now if we go back to our host app in the browser, we should have a nav with a li
 
 ## Online Shop MFE
 
+Again we will install the routing library, this time tanstack router, and set up a minimal router with a few routes. We will use tanstack router's [code based routing](https://tanstack.com/router/latest/docs/framework/react/guide/code-based-routing) (as opposed to their alternative, file base routing).
+
+```
+// onlineShop/src/router.jsx
+import {
+    createRootRoute,
+    createRoute,
+    createRouter,
+    Link,
+    Outlet,
+} from "@tanstack/react-router";
+
+const rootRoute = createRootRoute({
+    notFoundComponent: () => null,
+});
+
+const baseRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/online-shop",
+    component: () => (
+        <div>
+            <div>
+                <Link to="/online-shop/products">Products</Link>
+            </div>
+            <div>
+                <Link to="/online-shop/cart">Cart</Link>
+            </div>
+            <div>
+                <Link to="/">Home</Link>
+            </div>
+            <p>Online Shop: /online-shop</p>
+            <Outlet />
+        </div>
+    ),
+});
+
+const productsRoute = createRoute({
+    getParentRoute: () => baseRoute,
+    path: "products",
+    component: () => <div>Online Shop: /online-shop/products</div>,
+});
+
+const cartRoute = createRoute({
+    getParentRoute: () => baseRoute,
+    path: "cart",
+    component: () => <div>Online Shop: /online-shop/cart</div>,
+});
+
+const routeTree = rootRoute.addChildren([
+    baseRoute.addChildren([productsRoute, cartRoute]),
+]);
+
+export const router = createRouter({
+    routeTree,
+});
+```
+
+```
+// onlineShop/src/App.jsx
+import { RouterProvider } from "@tanstack/react-router";
+import { router } from "./router";
+
+function App() {
+    return <RouterProvider router={router} />;
+}
+
+export default App;
+```
+
+Note that in the `router.jsx` file, we define a `notFoundComponent` on our root route, to render nothing. Most routing libraries provide a default "not found" component, but we need to override because we want our Online Shop MFE to render nothing when we are not at a route starting with `/online-shop`.
+
+Also note that we added a link to `/` in the tanstack router. When we click this link, it will route us out of the online store MFE, and back into the host application.
+
+Finally, we need to change the id of the element that we mount the react app inside of, to match the id of the div we created in the host app's index.html for mounting the Online Store MFE. And also change the id of the mount div in the online store's index.html, so it can mount correctly when running independently.
+
+```
+// onlineShop/src/main.jsx
+createRoot(document.getElementById("onlineShopRoot")).render(<App />);
+```
+
+```
+// onlineShop/index.html
+<div id="onlineShopRoot"></div>
+```
+
 ## Store locator MFE
 
-## Syncing the routing between Host and MFE's
+## Rendering the MFE inside the host app
+
+Now that we have a host application and an MFE, we will to integrate the MFE into the host application (we'll come back to the 2nd MFE, Store Locator, later on).
+
+We already have a div in which to mount the Online Store MFE inside of the Host application's `index.html` file, and starting the host dev server with vite will take care of loading the javascript for the host application, but we need to also load the javascript of the Online Store MFE to render that application inside of the host.
+
+For now we will use a quick fix in order to load the MFE, and we will return to this problem later on. To load the JS on the MFE, we will do the following steps:
+
+-   Create a production build of our MFE using `npm run build` from inside the `onlineShop` directory.
+-   Find the built js file inside of `onlineShop/dist/assets`. The file name will be different every time, something like `index-mbwqfhvj.js`.
+-   Move the above js file inside of the host application's `public` directory.
+
+Then in the host application's index.html file, we can now add a script tag referencing the online shop's built html file:
+
+```
+<script type="module" src="./public/index-mbwqfhvj.js"></script>
+</body>
+```
+
+## MFE integration issues
+
+### 1
+
+So we now have the JS of the MFE linked inside the host application, we should be able to run the host app and see our online shop rendering inside of our host application. Lets take a look, we will run our host app and navigate to the `/online-store` route using our header link.
+
+![Host](./blog_images/host_with_online_shop_initial.PNG)
+
+So we have our online shop app rendering, except it's actually rendering below our header, not inside the main page of our host where we want it to render. This is because we have to mount the MFE into a div that exists as soon as the html page loads (the div with id "onlineShopRoot" that we created), which comes after the root div of the host application in the dom.
+
+![Host](./blog_images/dom_structure.PNG)
+
+The MFE mounts as soon as the host application mounts, but remains "dormant", not rendering anything, until we visit the `/online-shop` route.
+
+So we need a way to render all of our online shop UI inside of the div with id "onlineShopContainer", which is rendered inside of the host application only when we are at a route starting with `/online-shop`. For this we can use React Portals.
+
+Lets modify our `/online-shop` route code in the onlineShop router so that the UI for that route, and all it's child routes, are actually rendered inside the host application using a portal. We will render the portal inside the host's "onlineShopContainer" div:
+
+```
+// onlineShop/src/router.jsx
+import { createPortal } from 'react-dom';
+...
+const baseRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/online-shop",
+    component: () =>
+        createPortal(
+            <div>
+                <div>
+                    <Link to="/online-shop/products">Products</Link>
+                </div>
+                <div>
+                    <Link to="/online-shop/cart">Cart</Link>
+                </div>
+                <div>
+                    <Link to="/">Home</Link>
+                </div>
+                <p>Online Shop: /online-shop</p>
+                <Outlet />
+            </div>,
+            document.getElementById("onlineShopContainer")
+        ),
+});
+```
+
+As we've edited our online store MFE app, we need to rebuild it and re-link the JS file in the host app again (same steps as above).
+
+Now if we visit the host app in the browser again, we can see the MFE is now rendering inside the main page of the host app.
+
+![Host](./blog_images/online_shop_inside_host.PNG)
+
+### 2
