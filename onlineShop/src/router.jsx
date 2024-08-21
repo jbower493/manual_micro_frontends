@@ -5,7 +5,6 @@ import {
     Link,
     Outlet,
 } from "@tanstack/react-router";
-import { createPortal } from "react-dom";
 
 const rootRoute = createRootRoute({
     notFoundComponent: () => null,
@@ -14,23 +13,21 @@ const rootRoute = createRootRoute({
 const baseRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/online-shop",
-    component: () =>
-        createPortal(
+    component: () => (
+        <div>
             <div>
-                <div>
-                    <Link to="/online-shop/products">Products</Link>
-                </div>
-                <div>
-                    <Link to="/online-shop/cart">Cart</Link>
-                </div>
-                <div>
-                    <Link to="/">Home</Link>
-                </div>
-                <p>Online Shop: /online-shop</p>
-                <Outlet />
-            </div>,
-            document.getElementById("onlineShopContainer")
-        ),
+                <Link to="/online-shop/products">Products</Link>
+            </div>
+            <div>
+                <Link to="/online-shop/cart">Cart</Link>
+            </div>
+            <div>
+                <Link to="/">Home</Link>
+            </div>
+            <p>Online Shop: /online-shop</p>
+            <Outlet />
+        </div>
+    ),
 });
 
 const productsRoute = createRoute({

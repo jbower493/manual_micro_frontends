@@ -1,4 +1,5 @@
 import { createBrowserRouter, Link, Outlet } from "react-router-dom";
+import { OnlineShopLoader } from "./onlineShopLoader";
 
 export const router = createBrowserRouter([
     {
@@ -30,7 +31,12 @@ export const router = createBrowserRouter([
             },
             {
                 path: "/online-shop/*",
-                element: <div id="onlineShopContainer">Host: /online-shop</div>,
+                element: (
+                    <div>
+                        <div>Host: /online-shop</div>
+                        <OnlineShopLoader />
+                    </div>
+                ),
             },
             {
                 path: "/store-locator",

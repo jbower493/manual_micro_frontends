@@ -126,12 +126,12 @@ export const router = createBrowserRouter([
             },
             {
                 path: "/online-shop/*",
-                element: <div id="onlineShopContainer">Host: /online-shop</div>,
+                element: <div id="onlineShopRoot">Host: /online-shop</div>,
             },
             {
                 path: "/store-locator",
                 element: (
-                    <div id="storeLocatorContainer">Host: /store-locator</div>
+                    <div id="storeLocatorRoot">Host: /store-locator</div>
                 ),
             },
         ],
@@ -186,24 +186,6 @@ main {
 footer {
     background-color: lightpink;
 }
-```
-
-Finally (for now) we'll add two extra "root" div's in the index.html file. These div's are where we will mount our 2 MFE applications.
-
-```
-// host/src/index.html
-<body>
-    <!-- Host app mount -->
-    <div id="root"></div>
-
-    <!-- Online shop MFE mount -->
-    <div id="onlineShopRoot"></div>
-
-    <!-- Store locator MFE mount -->
-    <div id="storeLocatorRoot"></div>
-
-    <script type="module" src="/src/main.jsx"></script>
-</body>
 ```
 
 Now if we go back to our host app in the browser, we should have a nav with a link to each of our routes, and the code for each route should render in the main page when that route is active.
@@ -285,7 +267,7 @@ Note that in the `router.jsx` file, we define a `notFoundComponent` on our root 
 
 Also note that we added a link to `/` in the tanstack router. When we click this link, it will route us out of the online store MFE, and back into the host application.
 
-Finally, we need to change the id of the element that we mount the react app inside of, to match the id of the div we created in the host app's index.html for mounting the Online Store MFE. And also change the id of the mount div in the online store's index.html, so it can mount correctly when running independently.
+Finally, we need to change the id of the element that we mount the react app inside of, to match the id of the div with `id="onlineShopRoot"` we created in the host app's `/online-shop` route, for mounting the Online Shop MFE. And also change the id of the mount div in the online store's index.html, so it can mount correctly when running independently.
 
 ```
 // onlineShop/src/main.jsx
@@ -303,70 +285,62 @@ createRoot(document.getElementById("onlineShopRoot")).render(<App />);
 
 Now that we have a host application and an MFE, we will to integrate the MFE into the host application (we'll come back to the 2nd MFE, Store Locator, later on).
 
-We already have a div in which to mount the Online Store MFE inside of the Host application's `index.html` file, and starting the host dev server with vite will take care of loading the javascript for the host application, but we need to also load the javascript of the Online Store MFE to render that application inside of the host.
+We already have a div in which to mount the Online Store MFE inside of the Host application's `/online-shop` route, and starting the host dev server with vite will take care of loading the javascript for the host application, but we need to also load the javascript of the Online Store MFE to render that application inside of the host, when the route matches `/online-shop/*`.
 
-For now we will use a quick fix in order to load the MFE, and we will return to this problem later on. To load the JS on the MFE, we will do the following steps:
+For now we will use a quick fix in order to have access to the script for the the MFE, inside of the host, and we will return to this problem later on. For now lets just build the MFE, and move the script into the host app's `public` folder:
 
 -   Create a production build of our MFE using `npm run build` from inside the `onlineShop` directory.
 -   Find the built js file inside of `onlineShop/dist/assets`. The file name will be different every time, something like `index-mbwqfhvj.js`.
 -   Move the above js file inside of the host application's `public` directory.
 
-Then in the host application's index.html file, we can now add a script tag referencing the online shop's built html file:
+In order to mount and unmount the Online Shop MFE when we match and unmatch the `/online-shop` route in the host, we will implement a script loader component which will fetch and run the script when the `/online-shop` route mounts and unmounts:
 
 ```
-<script type="module" src="./public/index-mbwqfhvj.js"></script>
-</body>
+// host/src/onlineShopLoader.jsx
+import { useEffect } from "react";
+
+export function OnlineShopLoader() {
+    useEffect(() => {
+        const script = document.createElement("script");
+        script.src = `./public/index-DX0otGb_.js`;
+        script.type = "module";
+        script.defer = true;
+        document.body.appendChild(script);
+
+        return () => {
+            document.body.removeChild(script);
+        };
+    }, []);
+
+    return <div id="onlineShopRoot"></div>;
+}
 ```
+
+Note that we set the src of the script to the file name of the MFE build that we moved into the host public folder.
+
+So we now have the JS of the MFE linked inside the host application, we should be able to run the host app and see our online shop rendering inside of our host application. Lets take a look, we will run our host app and navigate to the `/online-store` route using our header link.
+
+![Host](./blog_images/online_shop_inside_host.PNG)
+
+Great, looks like the online shop MFE is successfully rendering inside of the host app!
 
 ## MFE integration issues
 
 ### 1
 
-So we now have the JS of the MFE linked inside the host application, we should be able to run the host app and see our online shop rendering inside of our host application. Lets take a look, we will run our host app and navigate to the `/online-store` route using our header link.
+So we have our online shop app rendering at the `/online-shop` route, except if we then navigate to a different route, and back to the `/online-shop` route again, we no longer see the online shop MFE rendering.
 
-![Host](./blog_images/host_with_online_shop_initial.PNG)
+![Host](./blog_images/online_shop_inside_host_renavigate.PNG)
 
-So we have our online shop app rendering, except it's actually rendering below our header, not inside the main page of our host where we want it to render. This is because we have to mount the MFE into a div that exists as soon as the html page loads (the div with id "onlineShopRoot" that we created), which comes after the root div of the host application in the dom.
+If we open the dev tools "elements" tab while we navigate back and forth to and from the `/online-shop` route, we can see that the MFE script is being added and removed from the dom every time. But the browser is actually caching the script and marking it as "already run", so it doesn't run again on subsequent loads after the first one.
 
-![Host](./blog_images/dom_structure.PNG)
-
-The MFE mounts as soon as the host application mounts, but remains "dormant", not rendering anything, until we visit the `/online-shop` route.
-
-So we need a way to render all of our online shop UI inside of the div with id "onlineShopContainer", which is rendered inside of the host application only when we are at a route starting with `/online-shop`. For this we can use React Portals.
-
-Lets modify our `/online-shop` route code in the onlineShop router so that the UI for that route, and all it's child routes, are actually rendered inside the host application using a portal. We will render the portal inside the host's "onlineShopContainer" div:
+We can fix this by adding a query param with a timestamp to the script src:
 
 ```
-// onlineShop/src/router.jsx
-import { createPortal } from 'react-dom';
-...
-const baseRoute = createRoute({
-    getParentRoute: () => rootRoute,
-    path: "/online-shop",
-    component: () =>
-        createPortal(
-            <div>
-                <div>
-                    <Link to="/online-shop/products">Products</Link>
-                </div>
-                <div>
-                    <Link to="/online-shop/cart">Cart</Link>
-                </div>
-                <div>
-                    <Link to="/">Home</Link>
-                </div>
-                <p>Online Shop: /online-shop</p>
-                <Outlet />
-            </div>,
-            document.getElementById("onlineShopContainer")
-        ),
-});
+// host/src/onlineShopLoader.jsx
+script.src = `./public/index-DX0otGb_.js?date=${new Date().getTime()}`;
 ```
 
-As we've edited our online store MFE app, we need to rebuild it and re-link the JS file in the host app again (same steps as above).
-
-Now if we visit the host app in the browser again, we can see the MFE is now rendering inside the main page of the host app.
-
-![Host](./blog_images/online_shop_inside_host.PNG)
+This will prevent the browser caching the script as it will see it as a new script every time it loads, so our MFE will now mount again every time we navigate back to the `/online-shop` route.
 
 ### 2
