@@ -326,7 +326,7 @@ Great, looks like the online shop MFE is successfully rendering inside of the ho
 
 ## MFE integration issues
 
-### 1
+### MFE not rendering after navigating away and back
 
 So we have our online shop app rendering at the `/online-shop` route, except if we then navigate to a different route, and back to the `/online-shop` route again, we no longer see the online shop MFE rendering.
 
@@ -343,4 +343,18 @@ script.src = `./public/index-DX0otGb_.js?date=${new Date().getTime()}`;
 
 This will prevent the browser caching the script as it will see it as a new script every time it loads, so our MFE will now mount again every time we navigate back to the `/online-shop` route.
 
-### 2
+### 2 Host app and MFE routing not in sync
+
+We can successfully navigate to and from our `/online-shop` route, and inside of the MFE, we can also navigate between the `/online-shop/products` and `/online-shop/cart` routes and everything works as expected. But what about if we click our "Home" link inside the MFE app, to navigate back to our `/` route? The URL has changed to `/`, and the MFE is no longer rendering anything, but the host app is still rendering its `/online-shop` page.
+
+![Navigate back to /](./blog_images/navigate_back_to_slash.PNG)
+
+If we look at the elements in the dev tools, we can see that the MFE script has not actually unmounted. This is because there is currently no communication between the 2 routers in the 2 separate applications, so the host app's router does not know that the route has changed (because the navigation was done within the MFE).
+
+We need a way for the host app to listen for route changes within the MFE, and update it's own route state accordingly. For this, we will use `window.postMessage` to send and listen to messages to the `window` object, which is shared between all scripts running on a web page.
+
+We'll add a useEffect in the root route of or MFE, which listens for changes to the URL, and then posts a custom event to the window to notify the host application that there has been a route change.
+
+```
+
+```
