@@ -375,7 +375,9 @@ const rootRoute = createRootRoute({
 
 Note: We then need to rebuild our online shop MFE, and re-link the JS script in our host, like we did earlier.
 
-Now in our host application, we will add an event listener to the root route component which listens for the "ROUTE_CHANGE" message. When this message is recieved by the host application, we know that a navigation has happened within the MFE, so therefore the URL pathname has changed and is now different to the pathname stored in the router state in our host application. We can then read the new pathname directly from `window.location.pathname`, and trigger a navigation to that new pathname in our host application.
+Now in our host application, we will add an event listener on the window, on mount of the root route, which listens for the "ROUTE_CHANGE" message. When this message is recieved by the host application, we know that a navigation has happened within the MFE, so therefore the URL pathname has changed and is now different to the pathname stored in the router state in our host application. We can then read the new pathname directly from `window.location.pathname`, and trigger a navigation to that new pathname in our host application.
+
+Lets extract our root route "element" out into a component so that we can use a useEffect to add the event listener:
 
 ```
 
