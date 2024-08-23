@@ -1,25 +1,42 @@
 import { createBrowserRouter, Link, Outlet } from "react-router-dom";
 import { OnlineShopLoader } from "./onlineShopLoader";
+import { useEffect } from "react";
+
+function RootRoute() {
+    useEffect(() => {
+        function messageListener(event) {
+            console.log(event);
+        }
+
+        window.addEventListener("message", messageListener);
+
+        return () => {
+            window.removeEventListener("message", messageListener);
+        };
+    }, []);
+
+    return (
+        <div>
+            <header>
+                Header
+                <nav>
+                    <Link to="/">Home</Link>
+                    <Link to="/about">About</Link>
+                    <Link to="/online-shop">Online Shop</Link>
+                    <Link to="/store-locator">Store Locator</Link>
+                </nav>
+            </header>
+            <main>
+                <Outlet />
+            </main>
+            <footer>Footer</footer>
+        </div>
+    );
+}
 
 export const router = createBrowserRouter([
     {
-        element: (
-            <div>
-                <header>
-                    Header
-                    <nav>
-                        <Link to="/">Home</Link>
-                        <Link to="/about">About</Link>
-                        <Link to="/online-shop">Online Shop</Link>
-                        <Link to="/store-locator">Store Locator</Link>
-                    </nav>
-                </header>
-                <main>
-                    <Outlet />
-                </main>
-                <footer>Footer</footer>
-            </div>
-        ),
+        element: <RootRoute />,
         children: [
             {
                 path: "/",

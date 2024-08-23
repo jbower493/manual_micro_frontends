@@ -349,11 +349,33 @@ We can successfully navigate to and from our `/online-shop` route, and inside of
 
 ![Navigate back to /](./blog_images/navigate_back_to_slash.PNG)
 
-If we look at the elements in the dev tools, we can see that the MFE script has not actually unmounted. This is because there is currently no communication between the 2 routers in the 2 separate applications, so the host app's router does not know that the route has changed (because the navigation was done within the MFE).
+If we look at the elements in the dev tools, we can see that the MFE script has not actually unmounted. This is because there is currently no communication between the 2 routers in the 2 separate applications, so the host app's router does not know that the route has changed (because the navigation was done within the MFE). The "router state" in the host app and the actual url pathname have become out of sync.
 
-We need a way for the host app to listen for route changes within the MFE, and update it's own route state accordingly. For this, we will use `window.postMessage` to send and listen to messages to the `window` object, which is shared between all scripts running on a web page.
+We need a way for the host app to listen for route changes within the MFE, and update it's own router state accordingly. For this, we will use `window.postMessage` to send and listen to messages to the `window` object, which is shared between all scripts running on a web page.
 
-We'll add a useEffect in the root route of or MFE, which listens for changes to the URL, and then posts a custom event to the window to notify the host application that there has been a route change.
+We'll add a useEffect in the root route of our MFE, which listens for changes to the pathname, and then posts a custom message to the window to notify the host application that there has been a route change. Given that we're adding a "component" to the root route, we need to make sure we return an `<Outlet />` from that component (in Tanstack Router, the default route component is an outlet if none is specified), otherwise none of the child routes will render.
+
+```
+// onlineShop/src/router.jsx
+function RootRouteComponent() {
+    const location = useLocation();
+
+    useEffect(() => {
+        window.postMessage("ROUTE_CHANGE");
+    }, [location.pathname]);
+
+    return <Outlet />;
+}
+
+const rootRoute = createRootRoute({
+    notFoundComponent: () => null,
+    component: RootRouteComponent,
+});
+```
+
+Note: We then need to rebuild our online shop MFE, and re-link the JS script in our host, like we did earlier.
+
+Now in our host application, we will add an event listener to the root route component which listens for the "ROUTE_CHANGE" message. When this message is recieved by the host application, we know that a navigation has happened within the MFE, so therefore the URL pathname has changed and is now different to the pathname stored in the router state in our host application. We can then read the new pathname directly from `window.location.pathname`, and trigger a navigation to that new pathname in our host application.
 
 ```
 

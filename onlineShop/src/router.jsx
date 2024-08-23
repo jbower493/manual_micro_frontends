@@ -4,30 +4,54 @@ import {
     createRouter,
     Link,
     Outlet,
+    useLocation,
 } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/router-devtools";
+import React, { useEffect } from "react";
+
+function RootRouteComponent() {
+    const location = useLocation();
+
+    console.log("root route rerendered");
+
+    // useEffect(() => {
+    //     console.log(location.pathname);
+    //     window.postMessage("ROUTE_CHANGE");
+    // }, [location.pathname]);
+
+    return (
+        <>
+            <Outlet />
+            <TanStackRouterDevtools />
+        </>
+    );
+}
 
 const rootRoute = createRootRoute({
     notFoundComponent: () => null,
+    component: RootRouteComponent,
 });
 
 const baseRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/online-shop",
-    component: () => (
-        <div>
+    component: () => {
+        return (
             <div>
-                <Link to="/online-shop/products">Products</Link>
+                <div>
+                    <Link to="/online-shop/products">Products</Link>
+                </div>
+                <div>
+                    <Link to="/online-shop/cart">Cart</Link>
+                </div>
+                <div>
+                    <Link to="/">Home</Link>
+                </div>
+                <p>Online Shop: /online-shop</p>
+                <Outlet />
             </div>
-            <div>
-                <Link to="/online-shop/cart">Cart</Link>
-            </div>
-            <div>
-                <Link to="/">Home</Link>
-            </div>
-            <p>Online Shop: /online-shop</p>
-            <Outlet />
-        </div>
-    ),
+        );
+    },
 });
 
 const productsRoute = createRoute({
