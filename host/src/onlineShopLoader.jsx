@@ -1,17 +1,21 @@
+import { useRef } from "react";
 import { useEffect } from "react";
 
 export function OnlineShopLoader() {
+    const rootRef = useRef(null);
+
     useEffect(() => {
         const script = document.createElement("script");
-        script.src = `./public/index-C7-K6_Jd.js?date=${new Date().getTime()}`;
+        script.src = `./public/index-CUGCSRW-.js?date=${new Date().getTime()}`;
         script.type = "module";
         script.defer = true;
         document.body.appendChild(script);
 
         return () => {
+            window.postMessage("UNMOUNT_ONLINE_SHOP");
             document.body.removeChild(script);
         };
     }, []);
 
-    return <div id="onlineShopRoot"></div>;
+    return <div id="onlineShopRoot" ref={rootRef}></div>;
 }

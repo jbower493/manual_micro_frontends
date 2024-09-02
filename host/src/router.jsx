@@ -5,7 +5,7 @@ import { useEffect } from "react";
 function RootRoute() {
     useEffect(() => {
         function messageListener(event) {
-            console.log(event);
+            // console.log(event);
         }
 
         window.addEventListener("message", messageListener);
