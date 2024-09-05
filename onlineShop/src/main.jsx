@@ -7,7 +7,6 @@ root.render(<App />);
 
 function messageListener(event) {
     if (event.data === "UNMOUNT_ONLINE_SHOP") {
-        console.log(event.data);
         root.unmount();
 
         window.removeEventListener("message", messageListener);

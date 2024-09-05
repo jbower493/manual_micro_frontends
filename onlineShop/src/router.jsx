@@ -6,25 +6,16 @@ import {
     Outlet,
     useLocation,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/router-devtools";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 
 function RootRouteComponent() {
     const location = useLocation();
 
-    console.log("root route rerendered");
+    useEffect(() => {
+        window.postMessage("ROUTE_CHANGE");
+    }, [location.pathname]);
 
-    // useEffect(() => {
-    //     console.log(location.pathname);
-    //     window.postMessage("ROUTE_CHANGE");
-    // }, [location.pathname]);
-
-    return (
-        <>
-            <Outlet />
-            {/* <TanStackRouterDevtools /> */}
-        </>
-    );
+    return <Outlet />;
 }
 
 const rootRoute = createRootRoute({
@@ -36,6 +27,8 @@ const baseRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/online-shop",
     component: () => {
+        console.log('Online Shop MFE "/online-shop" route rendered');
+
         return (
             <div>
                 <div>
