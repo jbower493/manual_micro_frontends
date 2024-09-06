@@ -707,3 +707,87 @@ export default router;
 ```
 
 Lets rebuild our Vue MFE, re-link in the host, and then navigate back to the `/store-locator` route in the host app. If we then click the "Home" link inside the Store Locator MFE's navigation, it navigates us back to the `/` route in the host, and the "Host: /" page is displayed, telling us that the host app successfully recognized the navigation from with the Store Locator MFE.
+
+## Decoupling deployments
+
+So we've not got the whole setup working correctly. We have our host app running, and loading our 2 MFE's at runtime and rendering them then their respective routes are triggered. However we still have the issue to solve that we skipped over earlier. Currently if we make changes to either of the MFE's, we then have to also make a change in our host app (linking the JS files) in order to pull in the new version of the MFE.
+
+Lets fix that now. What we want to do is have some way to have the host application, when it needs to load one of the MFE's, to query some other server for the JS from the MFE it needs, but have that be served from the same URL every time, so that if we make changes to one of our MFE's and redploy it, the host will automatically pull in the new version of the MFE without requiring any code changes itself.
+
+To achieve this, we will spin up a simple [Express](https://expressjs.com/) server to serve our MFE JS file with. We can create an endpoint to send back the JS file we have deployed for that particular MFE.
+
+Firstly, lets navigate into our `host` directory, and install express and cors with `npm i express cors`. We need the `cors` package so that we don't get a cors error when requesting a script on a different domain (different port on localhost).
+
+Next we will spin up a barebones express server with the respective endpoints for each MFE, and have the endpoint look for a JS file with the name of that MFE, inside an `assets` folder, read in the JS file contents, and send it back in the response, with a `Content-Type: text/javascript` header:
+
+```
+// host/server/index.js
+import express from "express";
+import cors from "cors";
+import fs from "fs";
+
+const app = express();
+app.use(cors());
+
+app.get("/assets/:mfeName", (req, res) => {
+    res.setHeader("Content-Type", "text/javascript");
+    const js = fs.readFileSync(`./server/assets/${req.params.mfeName}.js`);
+    res.send(js);
+});
+
+app.listen(4000, () => console.log("server listening on port 4000"));
+```
+
+Then, we will take each built JS file from our 2 MFE's, move them both inside `host/server/assets`, and rename them to the name of the MFE's. So the JS file from the Online Shop MFE would now become `host/server/assets/onlineShop.js`, and the JS file from the Store Locator MFE becomes `host/server/assets/storeLocator.js`.
+
+Finally we need to update our `OnlineShopLoader` and `StoreLocatorLoader` components to now fetch the JS for their respective MFE from the express endpoint. This means that we can now have the host always just hit the same endpoint, and get back the latest deployed version of the MFE's:
+
+```
+// host/src/storeLocatorLoader.jsx
+useEffect(() => {
+    const script = document.createElement("script");
+    script.src = `http://localhost:4000/assets/storeLocator?date=${new Date().getTime()}`;
+```
+
+```
+// host/src/onlineShopLoader.jsx
+useEffect(() => {
+    const script = document.createElement("script");
+    script.src = `http://localhost:4000/assets/onlineShop?date=${new Date().getTime()}`;
+```
+
+Note: We still need the timestamp as a query param so that the browser doesn't cache the script requests.
+
+Now we can run (from inside the `host` directory) both our host frontend with `npm run dev`, and our host express server with `node ./server/index.js` at the same time. If we navigate to `/online-shop` and `/store-locator`, we should see that the respective MFE's are still loaded and unloaded correctly.
+
+![MFE's with Express](./blog_images/mfes_with_express.PNG)
+
+Now comes the magic! If we navigate to the host app in the browser and go to the `/store-locator/locations` route, we see the Locations View UI, which currently just displays the App name and the route we are on:
+
+![Store Locator locations](./blog_images/store_locator_locations.PNG)
+
+Next lets add some locations to our Store Locator MFE's "locations" page:
+
+```
+// storeLocator/src/views/LocationsView.vue
+<template>
+    <div>
+        <div>Store Locator: /store-locator/locations</div>
+        <h2>Lets see some of the locations</h2>
+        <p>London</p>
+        <p>Tokyo</p>
+        <p>Paris</p>
+        <p>New York</p>
+    </div>
+</template>
+```
+
+Now lets rebuild the Store Locator MFE and redploy the built js to the host server assets folder. If we now go back to the browser and refresh the `/store-locator/locations` route, we can see our list of locations, without having to make any changes to the host applications code, or redploy the host app!
+
+![Store Locator locations with list](./blog_images/store_locator_locations_with_list.PNG)
+
+## Summary
+
+So there we've seen an example of how we can have 3 separate applications, written with different frontend frameworks, using different routers, and bring them all together on same webpage, while having the ability to deploy each application separately without having to update anything in the other applications.
+
+This was a pretty minimal, "hand rolled" example of one way to achieve this, but there are existing tools out there such as Module Federation, and Single-SPA, which can help us overcome some of the issues faced when trying to implement microfrontends. Maybe I'll explore those tools in a future blog post, but I always believe it's good to try and understand the abstractions in a deeper way by figuring out how they work, and trying to achieve a similar result with a relatively "from scratch" solution. Even if it's just for learning purposes!

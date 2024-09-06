@@ -6,7 +6,7 @@ export function StoreLocatorLoader() {
 
     useEffect(() => {
         const script = document.createElement("script");
-        script.src = `/index-Wrdd1me8.js?date=${new Date().getTime()}`;
+        script.src = `http://localhost:4000/assets/storeLocator?date=${new Date().getTime()}`;
         script.type = "module";
         script.defer = true;
         document.body.appendChild(script);
