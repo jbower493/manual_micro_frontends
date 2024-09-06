@@ -129,7 +129,7 @@ export const router = createBrowserRouter([
                 element: <div id="onlineShopRoot">Host: /online-shop</div>,
             },
             {
-                path: "/store-locator",
+                path: "/store-locator/*",
                 element: (
                     <div id="storeLocatorRoot">Host: /store-locator</div>
                 ),
@@ -279,9 +279,7 @@ createRoot(document.getElementById("onlineShopRoot")).render(<App />);
 <div id="onlineShopRoot"></div>
 ```
 
-## Store locator MFE
-
-## Rendering the MFE inside the host app
+## Rendering the Online Shop MFE inside the host app
 
 Now that we have a host application and an MFE, we will to integrate the MFE into the host application (we'll come back to the 2nd MFE, Store Locator, later on).
 
@@ -302,7 +300,7 @@ import { useEffect } from "react";
 export function OnlineShopLoader() {
     useEffect(() => {
         const script = document.createElement("script");
-        script.src = `./public/index-DX0otGb_.js`;
+        script.src = `/index-DX0otGb_.js`;
         script.type = "module";
         script.defer = true;
         document.body.appendChild(script);
@@ -317,6 +315,21 @@ export function OnlineShopLoader() {
 ```
 
 Note that we set the src of the script to the file name of the MFE build that we moved into the host public folder.
+
+Now lets add the `onlineShopLoader` to our host router, inside the `/online-shop/*` route:
+
+```
+// host/src/router.jsx
+{
+    path: "/online-shop/*",
+    element: (
+        <div>
+            <div>Host: /online-shop</div>
+            <OnlineShopLoader />
+        </div>
+    ),
+},
+```
 
 So we now have the JS of the MFE linked inside the host application, we should be able to run the host app and see our online shop rendering inside of our host application. Lets take a look, we will run our host app and navigate to the `/online-store` route using our header link.
 
@@ -338,12 +351,72 @@ We can fix this by adding a query param with a timestamp to the script src:
 
 ```
 // host/src/onlineShopLoader.jsx
-script.src = `./public/index-DX0otGb_.js?date=${new Date().getTime()}`;
+script.src = `/index-DX0otGb_.js?date=${new Date().getTime()}`;
 ```
 
 This will prevent the browser caching the script as it will see it as a new script every time it loads, so our MFE will now mount again every time we navigate back to the `/online-shop` route.
 
-### 2 Host app and MFE routing not in sync
+### 2 Online Shop MFE not properly unmounting
+
+Lets add a console log to the `/online-shop` route component of our MFE app, to verify that everything is working as expected when we mount and unmount the MFE.
+
+```
+// onlineShop/src/router.jsx
+const baseRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/online-shop",
+    component: () => {
+        console.log('Online Shop MFE "/online-shop" route rendered');
+```
+
+Note: We then need to rebuild our online shop MFE, and re-link the JS script in our host, like we did earlier.
+
+Now if we click back and forth between the "Home" and "Online Shop" header links a few times, we can see that our console log is actually running more times every time we go back to the `/online-shop` route.
+
+This is because although we are removing the dom element that the online shop MFE is mounted in, the react tree of the MFE still exists in memory, so the router of the MFE still exists and is still rendering itself ("rendering" in terms of react renders, not actually rendering to the dom). Therefore each time we umnount and remount the MFE, we are essentially creating a new version of the MFE router, without removing the previous one from memory.
+
+In order to solve this problem, we can use a method that react-dom adds to the result of it's `createRoot` function, called `unmount`. With a regular react app we don't need to use this method, because we are only rendering one app on the page, and it never needs to be removed and re-added.
+
+So we'll do 2 things in order to call this `unmount` method at the correct time. First we'll update our `onlineShopLoader` in the host app, we'll add a `window.postMessage` call in the useEffect cleanup function, in order to notify the MFE that it needs to unmount itself.
+
+```
+// host/src/onlineShopLoader.jsx
+useEffect(() => {
+    const script = document.createElement("script");
+    script.src = `/index-D56CCO_z.js?date=${new Date().getTime()}`;
+    script.type = "module";
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+        window.postMessage("UNMOUNT_ONLINE_SHOP");
+        document.body.removeChild(script);
+    };
+}, []);
+```
+
+Then in the online shop MFE app, we will update our main.jsx file to store the result of `createRoot` in a variable, and then add a "message" event listener to the window to listen for the "UNMOUNT_ONLINE_SHOP" being posted from the host app. When the MFE receives this message from the host, we will call `root.unmount()`, in order to remove the whole react tree of the MFE from memory.
+
+```
+// onlineShop/src/main.jsx
+const rootDiv = document.getElementById("onlineShopRoot");
+const root = createRoot(rootDiv);
+root.render(<App />);
+
+function messageListener(event) {
+    if (event.data === "UNMOUNT_ONLINE_SHOP") {
+        root.unmount();
+
+        window.removeEventListener("message", messageListener);
+    }
+}
+
+window.addEventListener("message", messageListener);
+```
+
+Now once we rebuild and re-link our MFE, we will see that our console log is now only running once each time we unmount and remount the MFE.
+
+### 3 Host app and MFE routing not in sync
 
 We can successfully navigate to and from our `/online-shop` route, and inside of the MFE, we can also navigate between the `/online-shop/products` and `/online-shop/cart` routes and everything works as expected. But what about if we click our "Home" link inside the MFE app, to navigate back to our `/` route? The URL has changed to `/`, and the MFE is no longer rendering anything, but the host app is still rendering its `/online-shop` page.
 
@@ -373,12 +446,264 @@ const rootRoute = createRootRoute({
 });
 ```
 
-Note: We then need to rebuild our online shop MFE, and re-link the JS script in our host, like we did earlier.
+Note: Now rebuild our online shop MFE, and re-link JS again
 
-Now in our host application, we will add an event listener on the window, on mount of the root route, which listens for the "ROUTE_CHANGE" message. When this message is recieved by the host application, we know that a navigation has happened within the MFE, so therefore the URL pathname has changed and is now different to the pathname stored in the router state in our host application. We can then read the new pathname directly from `window.location.pathname`, and trigger a navigation to that new pathname in our host application.
+Now in our host application, we will add a message event listener on the window, on mount of the root route, which listens for the "ROUTE_CHANGE" message. When this message is recieved by the host application, we know that a navigation has happened within the MFE, so therefore the URL pathname has changed and is now different to the pathname stored in the router state in our host application. We can then read the new pathname directly from `window.location.pathname`, and trigger a navigation to that new pathname in our host application.
 
-Lets extract our root route "element" out into a component so that we can use a useEffect to add the event listener:
+Lets extract our root route "element" out into a component so that we can use a useEffect to add the event listener, and for now we'll just console.log `event.data`, so that we can verify that the route change message is being received by the host app:
 
+```
+// host/src/router.jsx
+function RootRoute() {
+    useEffect(() => {
+        function messageListener(event) {
+            console.log(event.data);
+        }
+
+        window.addEventListener("message", messageListener);
+
+        return () => {
+            window.removeEventListener("message", messageListener);
+        };
+    }, []);
+
+    return (
+        <div>
+            <header>
+                Header
+                <nav>
+                    <Link to="/">Home</Link>
+                    <Link to="/about">About</Link>
+                    <Link to="/online-shop">Online Shop</Link>
+                    <Link to="/store-locator">Store Locator</Link>
+                </nav>
+            </header>
+            <main>
+                <Outlet />
+            </main>
+            <footer>Footer</footer>
+        </div>
+    );
+}
+
+export const router = createBrowserRouter([
+    {
+        element: <RootRoute />,
+```
+
+Now if we click the "Online Shop" header link to load up the MFE, and the click "Products" within the MFE navigation, we should see `ROUTE_CHANGE` being logged to the console:
+
+![Route change](./blog_images/route_change_log.PNG)
+
+Now, when we receive that message telling us that the MFE has changed route, lets call the `navigate` function returned from react-router-dom's `useNavigate` hook, in order to sync up our host app router state with the actual url state. We must also pass the `replace` flag to the `navigate` function, otherwise we would end up with a duplicate entry in the browsers history stack, meaning the browser "back" button wouldn't work on the first click.
+
+```
+// host/src/router.jsx
+function RootRoute() {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        function messageListener(event) {
+            if (event.data === "ROUTE_CHANGE") {
+                navigate(window.location.pathname, { replace: true });
+            }
+        }
+```
+
+Now, if we navigate to our `/online-shop` route, and click the "Home" link inside the MFE app's navigation, the host app now recognized that we have navigated back to the `/` route, and updates it's UI accordingly, to show it's home page, meaning that we've now successfully synced up the navigation between the 2 different routers:
+
+![Host home](./blog_images/host_home.PNG)
+
+## Store locator MFE
+
+So now that we have the host app and the online store MFE playing nicely together (both react apps), lets introduce a 2nd MFE which into the mix, which as mentioned earlier, will be a Vue application.
+
+I won't go into too much detail about how we create the Vue MFE, as it's pretty much the same as our React Online Shop MFE. We will spin up a new Vue app in the `storeLocator` directory by following the Vue JS [quick start guide](https://vuejs.org/guide/quick-start.html). We will then strip out most of the `src` directory, and add some new stuff, so we just have the following files:
+
+```
+// storeLocator/src/main.js
+import { createApp } from "vue";
+import App from "./App.vue";
+import router from "./router.js";
+
+const app = createApp(App);
+app.use(router);
+app.mount("#storeLocatorRoot");
 ```
 
 ```
+// storeLocator/src/router.js
+import { createRouter, createWebHistory } from "vue-router";
+import HomeView from "./views/HomeView.vue";
+import LocationsView from "./views/LocationsView.vue";
+import OpeningHoursView from "./views/OpeningHoursView.vue";
+
+const router = createRouter({
+    history: createWebHistory(import.meta.env.BASE_URL),
+    routes: [
+        {
+            path: "/store-locator",
+            name: "home",
+            component: HomeView,
+            children: [
+                {
+                    path: "/store-locator/locations",
+                    name: "locations",
+                    component: LocationsView,
+                },
+                {
+                    path: "/store-locator/opening-hours",
+                    name: "hours",
+                    component: OpeningHoursView,
+                },
+            ],
+        },
+    ],
+});
+
+export default router;
+```
+
+```
+// storeLocator/src/App.vue
+<script setup>
+import { RouterView } from "vue-router";
+</script>
+
+<template>
+    <RouterView />
+</template>
+```
+
+```
+// storeLocator/src/views/HomeView.vue
+<script setup>
+import { RouterView, RouterLink } from "vue-router";
+</script>
+
+<template>
+    <div>
+        <RouterLink to="/store-locator/locations">Locations</RouterLink>
+    </div>
+    <div>
+        <RouterLink to="/store-locator/opening-hours">Opening Hours</RouterLink>
+    </div>
+    <div>
+        <RouterLink to="/">Home</RouterLink>
+    </div>
+
+    <div>Store Locator: /store-locator</div>
+
+    <RouterView />
+</template>
+```
+
+```
+// storeLocator/src/views/LocationsView.vue
+<template>
+    <div>Store Locator: /store-locator/locations</div>
+</template>
+```
+
+```
+// storeLocator/src/views/OpeningHoursView.vue
+<template>
+    <div>Store Locator: /store-locator/opening-hours</div>
+</template>
+```
+
+And finally we'll change the id of the root dom node in our html file to match the div id we will use when mounting it as an MFE inside the host:
+
+```
+// storeLocator/index.html
+<body>
+    <div id="storeLocatorRoot"></div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+```
+
+Now if we run the store locator MFE and navigate to the `/store-locator/locations` route, we should see a similar strucutre to what our online shop MFE renders:
+
+![Host home](./blog_images/vue_mfe.PNG)
+
+## Rendering the Store Locator MFE inside the host app
+
+Now we need to add a `storeLocatorLoader` component to handle the loading and unloading of the Store Locator MFE, just like we did for the Online Shop MFE. Lets create that component and add it to our host app's router, inside the `/store-locator/*` route:
+
+```
+// host/src/storeLocatorLoader.jsx
+import { useRef } from "react";
+import { useEffect } from "react";
+
+export function StoreLocatorLoader() {
+    const rootRef = useRef(null);
+
+    useEffect(() => {
+        const script = document.createElement("script");
+        script.src = `/index-CAZf1r2y.js?date=${new Date().getTime()}`;
+        script.type = "module";
+        script.defer = true;
+        document.body.appendChild(script);
+
+        return () => {
+            window.postMessage("UNMOUNT_STORE_LOCATOR");
+            document.body.removeChild(script);
+        };
+    }, []);
+
+    return <div id="storeLocatorRoot" ref={rootRef}></div>;
+}
+```
+
+```
+// host/src/router.jsx
+{
+    path: "/store-locator/*",
+    element: (
+        <div>
+            <div>Host: /store-locator</div>
+            <StoreLocatorLoader />
+        </div>
+    ),
+},
+```
+
+Next we just need to listen for that `UNMOUNT_STORE_LOCATOR` window message, in the Store Locator MFE, and then call the `unmount` function from Vue, just like we did for the React MFE:
+
+```
+// storeLocator/src/main.js
+const app = createApp(App);
+app.use(router);
+app.mount("#storeLocatorRoot");
+
+function messageListener(event) {
+    if (event.data === "UNMOUNT_STORE_LOCATOR") {
+        app.unmount();
+
+        window.removeEventListener("message", messageListener);
+    }
+}
+
+window.addEventListener("message", messageListener);
+```
+
+Next, lets build our build our Vue MFE using the Vue build command via `npm run build`. Then, like we did for the Online Shop MFE (React app), we will move the generated JS file into the host app's public folder, and link it in the `storeLocatorLoader.jsx` file in the host.
+
+Now if we run our host app and navigate to the `/store-locator` route by clicking Store Locator in the header, we should see our Store Locator MFE rendering withing the host application, along with the MFE's child routes, visible if we click the "Locations" link inside the MFE navigation.
+
+![Host with Vue MFE](./blog_images/host_with_vue_mfe.PNG)
+
+Finally, we need to handle the same issue we had with our Online Shop MFE, where the host was not aware that a navigation had been performed by the MFE's router. Lets follow a similar pattern within the Store Locator MFE, to notify the host app of the route change. The `ROUTE_CHANGE` message listener that we added to the host app already should handle this for us, we just need to post the `ROUTE_CHANGE` message from within the Store Locator MFE every time we navigate.
+
+To achieve this with the Vue router, we can add an `afterEach` hook to the router:
+
+```
+// storeLocator/src/router.js
+router.afterEach(() => {
+    window.postMessage("ROUTE_CHANGE");
+});
+
+export default router;
+```
+
+Lets rebuild our Vue MFE, re-link in the host, and then navigate back to the `/store-locator` route in the host app. If we then click the "Home" link inside the Store Locator MFE's navigation, it navigates us back to the `/` route in the host, and the "Host: /" page is displayed, telling us that the host app successfully recognized the navigation from with the Store Locator MFE.

@@ -1,11 +1,21 @@
-import { createBrowserRouter, Link, Outlet } from "react-router-dom";
+import {
+    createBrowserRouter,
+    Link,
+    Outlet,
+    useNavigate,
+} from "react-router-dom";
 import { OnlineShopLoader } from "./onlineShopLoader";
 import { useEffect } from "react";
+import { StoreLocatorLoader } from "./storeLocatorLoader";
 
 function RootRoute() {
+    const navigate = useNavigate();
+
     useEffect(() => {
         function messageListener(event) {
-            // console.log(event);
+            if (event.data === "ROUTE_CHANGE") {
+                navigate(window.location.pathname, { replace: true });
+            }
         }
 
         window.addEventListener("message", messageListener);
@@ -56,9 +66,12 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: "/store-locator",
+                path: "/store-locator/*",
                 element: (
-                    <div id="storeLocatorContainer">Host: /store-locator</div>
+                    <div>
+                        <div>Host: /store-locator</div>
+                        <StoreLocatorLoader />
+                    </div>
                 ),
             },
         ],
